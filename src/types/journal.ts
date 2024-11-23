@@ -61,11 +61,31 @@ export interface HabitMetrics {
   totalEntries: number;
 }
 
+export interface HabitCompletion {
+  id: string;
+  habitId: string;
+  userId: number;
+  date: string;
+  completed: boolean;
+  value?: number;  // Optional value for quantitative habits
+  notes?: string;  // Optional notes about the completion
+  createdAt: string;
+}
+
+export interface HabitWithCompletions extends Habit {
+  completions?: HabitCompletion[];
+}
+
+export interface FinalReflection {
+  rating: number;
+  summary: string;
+}
+
 export interface JournalEntryData {
   id: string;
   date: string;
   userId: number;
-  habits: Habit[];
+  habits: HabitWithCompletions[];
   initialRating: number;  // Rating at the start of journaling
   finalRating: number;    // Rating after reflection
   gratitude: {
@@ -79,4 +99,5 @@ export interface JournalEntryData {
   personalGrowth: PersonalGrowth;
   goalTracking: GoalTracking;
   inspiration: Inspiration;
+  finalReflection: FinalReflection;
 }

@@ -24,8 +24,9 @@ import {
   Delete as DeleteIcon,
   Info as InfoIcon,
 } from '@mui/icons-material';
-import { Habit, HabitMetrics } from '../types/journal';
+import { Habit, HabitMetrics, HabitCompletion } from '../types/journal';
 import { getHabits, addHabit, deleteHabit, updateHabit } from '../services/habitService';
+import { getCompletions, getCompletionsInDateRange } from '../services/habitCompletionService';
 import { useAuth } from '../contexts/AuthContext';
 
 interface HabitMetricsMap {
@@ -56,19 +57,67 @@ const Habits: React.FC = () => {
   };
   const [newHabit, setNewHabit] = useState<Omit<Habit, 'id'>>(defaultHabit);
 
+  const calculateCompletionRate = (habit: Habit): number => {
+    // Calculate completion rate based on the last 30 days
+    const today = new Date();
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const completions = getCompletionsInDateRange(habit.id, thirtyDaysAgo, today);
+    const completedDays = completions.filter(c => c.completed).length;
+    
+    return (completedDays / 30) * 100;
+  };
+
+  const calculateStreak = (habit: Habit): number => {
+    const completions = getCompletions(habit.id);
+    if (!completions.length) return 0;
+
+    // Sort completions by date in descending order
+    const sortedCompletions = completions
+      .filter(c => c.completed)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    if (sortedCompletions.length === 0) return 0;
+
+    let streak = 1;
+    const msPerDay = 24 * 60 * 60 * 1000;
+    
+    // Count consecutive days
+    for (let i = 0; i < sortedCompletions.length - 1; i++) {
+      const currentDate = new Date(sortedCompletions[i].date);
+      const nextDate = new Date(sortedCompletions[i + 1].date);
+      
+      const dayDifference = Math.round((currentDate.getTime() - nextDate.getTime()) / msPerDay);
+      
+      if (dayDifference === 1) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+    
+    return streak;
+  };
+
+  const calculateTotalEntries = (habit: Habit): number => {
+    const completions = getCompletions(habit.id);
+    return completions.filter(c => c.completed).length;
+  };
+
   useEffect(() => {
     try {
       const loadedHabits = getHabits();
       setHabits(loadedHabits);
       
-      // Initialize metrics for each habit
+      // Initialize metrics for each habit with proper type safety
       const metrics: HabitMetricsMap = {};
       loadedHabits.forEach(habit => {
         metrics[habit.id] = {
           averageRating: habit.rating || 0,
-          completionRate: 0,
-          streak: 0,
-          totalEntries: 0
+          completionRate: calculateCompletionRate(habit),
+          streak: calculateStreak(habit),
+          totalEntries: calculateTotalEntries(habit)
         };
       });
       setHabitMetrics(metrics);
@@ -139,17 +188,28 @@ const Habits: React.FC = () => {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setNewHabit(prev => ({
-      ...prev,
-      [name]: value,
-    }));
+    if (name === 'target.value' || name === 'target.unit') {
+      const [parent, child] = name.split('.');
+      setNewHabit(prev => ({
+        ...prev,
+        target: {
+          ...prev.target,
+          [child]: child === 'value' ? Number(value) : value,
+        },
+      }));
+    } else {
+      setNewHabit(prev => ({
+        ...prev,
+        [name]: value,
+      }));
+    }
   };
 
-  const handleSelectChange = (e: SelectChangeEvent) => {
+  const handleSelectChange = (e: SelectChangeEvent<string>) => {
     const { name, value } = e.target;
     setNewHabit(prev => ({
       ...prev,
-      [name as string]: value,
+      [name]: value as Habit['frequency'] | Habit['category'],
     }));
   };
 
@@ -199,6 +259,20 @@ const Habits: React.FC = () => {
                   <Typography variant="body2">
                     Target: {habit.target.value} {habit.target.unit}
                   </Typography>
+                  <Grid container spacing={2} sx={{ mt: 1 }}>
+                    <Grid item xs={6}>
+                      <Typography variant="body2" color="text.secondary">Rating</Typography>
+                      <Typography variant="h6">
+                        {habit.rating || 0}/5
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="body2" color="text.secondary">Streak</Typography>
+                      <Typography variant="h6">
+                        {habitMetrics[habit.id]?.streak || 0} days
+                      </Typography>
+                    </Grid>
+                  </Grid>
                 </Box>
                 <Box>
                   <IconButton onClick={() => handleEditHabit(habit)} size="small">
