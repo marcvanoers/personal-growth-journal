@@ -54,6 +54,13 @@ export interface Inspiration {
   actionItems: string[];
 }
 
+export interface HabitMetrics {
+  averageRating: number;
+  completionRate: number;
+  streak: number;
+  totalEntries: number;
+}
+
 export interface JournalEntryData {
   id: string;
   date: string;

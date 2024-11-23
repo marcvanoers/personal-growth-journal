@@ -24,13 +24,18 @@ import {
   Delete as DeleteIcon,
   Info as InfoIcon,
 } from '@mui/icons-material';
-import { Habit } from '../types/journal';
+import { Habit, HabitMetrics } from '../types/journal';
 import { getHabits, addHabit, deleteHabit, updateHabit } from '../services/habitService';
 import { useAuth } from '../contexts/AuthContext';
+
+interface HabitMetricsMap {
+  [key: string]: HabitMetrics;
+}
 
 const Habits: React.FC = () => {
   const { user } = useAuth();
   const [habits, setHabits] = useState<Habit[]>([]);
+  const [habitMetrics, setHabitMetrics] = useState<HabitMetricsMap>({});
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedHabit, setSelectedHabit] = useState<Habit | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +60,18 @@ const Habits: React.FC = () => {
     try {
       const loadedHabits = getHabits();
       setHabits(loadedHabits);
+      
+      // Initialize metrics for each habit
+      const metrics: HabitMetricsMap = {};
+      loadedHabits.forEach(habit => {
+        metrics[habit.id] = {
+          averageRating: habit.rating || 0,
+          completionRate: 0,
+          streak: 0,
+          totalEntries: 0
+        };
+      });
+      setHabitMetrics(metrics);
       setError(null);
     } catch (err) {
       setError('Failed to load habits');
